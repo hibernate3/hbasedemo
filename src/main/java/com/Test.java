@@ -25,12 +25,11 @@ public class Test {
         return admin.tableExists(tableName);
     }
 
-    public static void createTable(String tableName, String... columnFamilies) throws IOException {
+    public static void createTable(String tableName, List<String> columnFamilies) throws IOException {
         HBaseAdmin admin = new HBaseAdmin(conf);
 
         if (!isTableExist(tableName)) {
             HTableDescriptor descriptor = new HTableDescriptor(TableName.valueOf(tableName));
-            descriptor.addCoprocessor("com.coprocessor.demo.InsertCoprocessor");//增加协处理器
 
             for (String cf : columnFamilies) {
                 descriptor.addFamily(new HColumnDescriptor(cf));
@@ -40,6 +39,40 @@ public class Test {
         }
     }
 
+    /**
+     * 创建分区和分区键
+     * */
+    public static void createTable(String tableName, int regionCount, List<String> columnFamilies) throws IOException {
+        HBaseAdmin admin = new HBaseAdmin(conf);
+
+        if (!isTableExist(tableName)) {
+            HTableDescriptor descriptor = new HTableDescriptor(TableName.valueOf(tableName));
+
+            for (String cf : columnFamilies) {
+                descriptor.addFamily(new HColumnDescriptor(cf));
+            }
+
+            byte[][] bs = genRegionKeys(regionCount);
+
+            admin.createTable(descriptor, bs);
+        }
+    }
+
+    public static void createTable(String tableName, String coprocessor, List<String> columnFamilies) throws IOException {
+        HBaseAdmin admin = new HBaseAdmin(conf);
+
+        if (!isTableExist(tableName)) {
+            HTableDescriptor descriptor = new HTableDescriptor(TableName.valueOf(tableName));
+            descriptor.addCoprocessor(coprocessor);//增加协处理器
+//            descriptor.addCoprocessor("com.coprocessor.demo.InsertCoprocessor");//增加协处理器
+
+            for (String cf : columnFamilies) {
+                descriptor.addFamily(new HColumnDescriptor(cf));
+            }
+
+            admin.createTable(descriptor);
+        }
+    }
     public static void deleteTable(String tableName) throws IOException {
         HBaseAdmin admin = new HBaseAdmin(conf);
         if (isTableExist(tableName)) {
@@ -48,8 +81,55 @@ public class Test {
         }
     }
 
+    /**
+     * 生成分区号前缀的row key
+     * */
+    public static String getRegionNumRowkey(String rowKey, int regionCount) {
+        int reginNum;
+        int hash = rowKey.hashCode() & Integer.MAX_VALUE;//hashcode可能为负数，确保其为正数
+
+        //hash散列平均分配
+        if (regionCount > 0 && (regionCount & (regionCount -1)) == 0) {
+            reginNum = hash & (regionCount - 1);
+        } else {
+            reginNum = hash % regionCount;
+        }
+
+        System.out.println(reginNum);
+
+        return reginNum + "_" + rowKey;
+    }
+
+    /**
+     * 生成分区键
+     * */
+    public static byte[][] genRegionKeys(int regionCount) {
+        byte[][] bs = new byte[regionCount - 1][];
+
+        for (int i = 0; i < regionCount - 1; i++) {
+            bs[i] = Bytes.toBytes(i + "|");
+        }
+
+        return bs;
+    }
+
     public static void addRowData(String tableName, String rowKey, String columnFamily, String column, String value) throws IOException {
         HTable hTable = new HTable(conf, tableName);
+
+        Put put = new Put(Bytes.toBytes(rowKey));
+        put.addColumn(Bytes.toBytes(columnFamily), Bytes.toBytes(column), Bytes.toBytes(value));
+
+        hTable.put(put);
+        hTable.close();
+    }
+
+    /**
+     * 根据rowkey均匀将数据插入各个region
+     * */
+    public static void addRowData(String tableName, String rowKey, String columnFamily, String column, String value, int regionCount) throws IOException {
+        HTable hTable = new HTable(conf, tableName);
+
+        rowKey = getRegionNumRowkey(rowKey, regionCount);
 
         Put put = new Put(Bytes.toBytes(rowKey));
         put.addColumn(Bytes.toBytes(columnFamily), Bytes.toBytes(column), Bytes.toBytes(value));
@@ -253,7 +333,5 @@ public class Test {
     }
 
     public static void main(String[] args) throws IOException {
-//        createTable("student", "info");
-        addRowData("student", "1001","info", "name", "Steven");
     }
 }
