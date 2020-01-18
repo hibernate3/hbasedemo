@@ -6,7 +6,11 @@
 
     <groupId>org.example</groupId>
     <artifactId>hbasedemo</artifactId>
+    <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
+    <modules>
+        <module>hbase-coprocessor-test</module>
+    </modules>
 
     <dependencies>
         <dependency>

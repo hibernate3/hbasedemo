@@ -30,6 +30,7 @@ public class Test {
 
         if (!isTableExist(tableName)) {
             HTableDescriptor descriptor = new HTableDescriptor(TableName.valueOf(tableName));
+            descriptor.addCoprocessor("com.coprocessor.demo.InsertCoprocessor");//增加协处理器
 
             for (String cf : columnFamilies) {
                 descriptor.addFamily(new HColumnDescriptor(cf));
@@ -252,6 +253,7 @@ public class Test {
     }
 
     public static void main(String[] args) throws IOException {
-        getWithColumnFilters("student");
+//        createTable("student", "info");
+        addRowData("student", "1001","info", "name", "Steven");
     }
 }
